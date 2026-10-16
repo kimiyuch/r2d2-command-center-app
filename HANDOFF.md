@@ -108,6 +108,21 @@ Still open in Phase 1:
 - **Floor plan editor** (pencil button in the map's bottom-right corner): drag room walls; walls are split into segments (`FloorPlanEditing.segments`): shared stretches get one handle per straight wall that moves every flush wall, transitively (`linkedEdges`); exterior stretches get their own handle that moves only that room's wall; ⌥ detaches; snaps to other rooms' walls (8 pt) or the 5 cm grid; rooms ≥ 20 cm. Corrections are stored per map id in UserDefaults (`FloorPlanStore`, only rooms that differ from the automatic plan) and applied over the helper's plan (`RobotMap.applying`); "Reset" per room or all. Purely visual + click targets; cleaning still goes by room id.
 - Not yet: cleaning path, no-go zones/virtual walls, live (uncleaned/cleaned) map during a run, rotating the map in the app.
 
+**Next session: Schedules** (user's wish 2026-10-16: e.g. "Mon 8:00 vacuum all rooms", "Wed 8:00 vacuum + mop all rooms"). Name in the app: **"Schedules"** (not "Task": the robot already reports a "task status"; Dreamehome calls it "Scheduled Cleaning"/"Zeitplan"). Store them **on the robot** so they run with the MacBook closed; don't schedule from the Mac.
+
+What we know (robot property 8.2 `SCHEDULE`, read via `dreame_vacuum`):
+```
+1-1-08:00-0100110-1-1-16-314572817-0   = Mon Thu Fri 08:00, Customize, all rooms, vacuum
+2-1-08:00-0001000-1-0-16-314572866-0   = Wed 08:00, Customize, all rooms, vacuum then mop
+```
+- Fields (`-`-separated, entries `;`-separated): id, enabled (`1`/`2` on, `3` invalid, presumably `0` off), time, weekdays (7 bits, **Sunday first**), `1` repeating / `0` once, unknown (`1` vs `0`; `dreame_vacuum` calls it map_id but it differs between the two on one map), `16` (probably "Customize"), packed settings (`0x12C00011` vacuum vs `0x12C00042` vacuum then mop; rest unknown), options (`0` = all rooms?).
+- Delete: action 8.1 with `SCHEDULE_ID` (8.3) = id (`DreameVacuumDevice.delete_scheduled_task`). Create/edit/toggle: **not implemented in `dreame_vacuum`, not documented anywhere**; probably writing 8.2.
+
+Plan (user agreed, to be done next session):
+1. **Write test** (with the user present): write 8.2 back with only the Wednesday schedule disabled, confirm in robot + Dreamehome app, re-enable. Keep the original string above to restore exactly.
+2. User creates two sample schedules in the Dreamehome app (all rooms): **"Vacuum and mop"** and **"Mop only"** → read 8.2 to learn those mode codes. (Room-specific schedules would need more samples; later.)
+3. Build "Schedules": helper methods (list, set enabled, create/edit, delete) + app UI (list like Dreamehome, toggle, delete, editor with time, weekdays, mode; all rooms).
+
 **Phase 3: Extras**
 - Notifications, dock actions (mop wash, drying, auto-empty), consumables, history.
 
