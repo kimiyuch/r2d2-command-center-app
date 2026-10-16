@@ -1,0 +1,58 @@
+name: DreameMac
+options:
+  bundleIdPrefix: digital.jamon
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: 3TWRBP96AK
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  DreameMac:
+    type: application
+    platform: macOS
+    sources: [DreameMac]
+    info:
+      path: DreameMac/Info.plist
+      properties:
+        CFBundleDisplayName: R2D2 Command Center
+        # Lets Siri also understand the short name, e.g. "Send the robot home with R2D2".
+        INAlternativeAppNames:
+          - INAlternativeAppName: R2D2
+        LSApplicationCategoryType: public.app-category.utilities
+        # Development setup: the app runs the Python helper straight from the repo.
+        DreameHelperDirectory: $(SRCROOT)/../helper
+    settings:
+      base:
+        # Display name changed to "R2D2 Command Center"; the bundle id stays so Keychain items and presets carry over.
+        PRODUCT_NAME: R2D2 Command Center
+        PRODUCT_MODULE_NAME: DreameMac
+        PRODUCT_BUNDLE_IDENTIFIER: digital.jamon.dreamemac
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # The app launches the Python helper as a subprocess, which the sandbox doesn't allow.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        GENERATE_INFOPLIST_FILE: NO
+  DreameMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [DreameMacTests]
+    dependencies:
+      - target: DreameMac
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/R2D2 Command Center.app/Contents/MacOS/R2D2 Command Center"
+schemes:
+  DreameMac:
+    build:
+      targets:
+        DreameMac: all
+        DreameMacTests: [test]
+    test:
+      targets: [DreameMacTests]

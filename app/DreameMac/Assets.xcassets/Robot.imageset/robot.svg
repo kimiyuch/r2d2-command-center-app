@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 760" role="img" aria-labelledby="title desc">
+<title id="title">Friendly cleaning robot</title>
+<desc id="desc">Original blue and ivory comic style cleaning robot with domed head, friendly eyes, utility arms, tank tracks, and a floor brush.</desc>
+<defs>
+  <linearGradient id="head" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fcf8"/><stop offset="1" stop-color="#a6c4c8"/></linearGradient>
+  <linearGradient id="body" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f5f5e9"/><stop offset="1" stop-color="#bac8c4"/></linearGradient>
+  <pattern id="grip" width="18" height="26" patternUnits="userSpaceOnUse"><path d="M3 8h12M3 19h12" stroke="#597580" stroke-width="4" stroke-linecap="round"/></pattern>
+</defs>
+<!-- ground / soft graphical shadow -->
+<ellipse cx="300" cy="706" rx="218" ry="25" fill="#183447" opacity=".12"/>
+<!-- left and right tank assemblies -->
+<g stroke="#172c42" stroke-width="9" stroke-linejoin="round">
+<path d="M118 500 Q91 507 88 549 L76 665 Q74 692 103 697 L170 697 Q189 688 192 665 L196 542 Q189 516 164 503Z" fill="#28465d"/>
+<path d="M436 500 Q411 516 408 543 L412 665 Q414 690 433 697 L501 697 Q530 691 527 665 L515 549 Q512 507 485 500Z" fill="#28465d"/>
+<path d="M110 541 L178 541 L167 674 L89 674Z" fill="url(#grip)"/>
+<path d="M425 541 L493 541 L514 674 L436 674Z" fill="url(#grip)"/>
+<path d="M116 509 L165 509 L153 539 L109 539Z" fill="#6bc5ce"/>
+<path d="M438 509 L486 509 L493 539 L447 539Z" fill="#6bc5ce"/>
+</g>
+<!-- upper arms -->
+<g stroke="#172c42" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+<path d="M157 286 C116 280 88 302 84 348 L79 443 Q76 484 113 494 L157 488 L176 440 L176 329Z" fill="#e7eee8"/>
+<path d="M443 286 C484 280 512 302 516 348 L521 443 Q524 484 487 494 L443 488 L424 440 L424 329Z" fill="#e7eee8"/>
+<path d="M94 353 L144 353 L140 447 L93 453Z" fill="#5db8c9"/>
+<path d="M506 353 L456 353 L460 447 L507 453Z" fill="#5db8c9"/>
+<circle cx="129" cy="321" r="25" fill="#203d57"/><circle cx="471" cy="321" r="25" fill="#203d57"/>
+<circle cx="129" cy="321" r="10" fill="#ffc66d"/><circle cx="471" cy="321" r="10" fill="#ffc66d"/>
+</g>
+<!-- main torso -->
+<path d="M175 280 Q300 257 425 280 L451 563 Q302 615 149 563Z" fill="url(#body)" stroke="#172c42" stroke-width="12" stroke-linejoin="round"/>
+<path d="M178 284 Q300 265 422 284 L430 351 Q300 370 170 351Z" fill="#317e9e" stroke="#172c42" stroke-width="8"/>
+<path d="M189 368 Q301 390 411 368 L422 535 Q300 564 177 535Z" fill="#e9f0e7" stroke="#6c939b" stroke-width="5"/>
+<!-- utility panels -->
+<rect x="201" y="397" width="190" height="109" rx="18" fill="#25485f" stroke="#172c42" stroke-width="8"/>
+<rect x="218" y="411" width="156" height="78" rx="12" fill="#85d4d1" stroke="#172c42" stroke-width="5"/>
+<path d="M257 446 q16 -21 32 0 q16 21 32 0" fill="none" stroke="#173b52" stroke-width="8" stroke-linecap="round"/>
+<path d="M229 474 h42 M321 474 h42" stroke="#f7fbf2" stroke-width="6" stroke-linecap="round"/>
+<circle cx="205" cy="332" r="8" fill="#ffcd77"/><circle cx="234" cy="332" r="8" fill="#ffcd77"/><circle cx="263" cy="332" r="8" fill="#ffcd77"/>
+<rect x="338" y="316" width="66" height="26" rx="12" fill="#193950"/><rect x="347" y="323" width="47" height="12" rx="6" fill="#9de3d2"/>
+<path d="M177 560 Q300 595 423 560" fill="none" stroke="#193950" stroke-width="10" stroke-linecap="round"/>
+<path d="M212 578 v30 M388 578 v30" stroke="#193950" stroke-width="11" stroke-linecap="round"/>
+<!-- neck -->
+<rect x="253" y="239" width="94" height="52" rx="14" fill="#25485f" stroke="#172c42" stroke-width="9"/>
+<path d="M264 268 H336" stroke="#78c8c8" stroke-width="7" stroke-linecap="round"/>
+<!-- domed head and face -->
+<path d="M157 206 L157 175 Q157 64 300 54 Q443 64 443 175 L443 206 Q443 260 300 268 Q157 260 157 206Z" fill="url(#head)" stroke="#172c42" stroke-width="12" stroke-linejoin="round"/>
+<path d="M180 160 Q201 80 300 79 Q399 80 420 160" fill="none" stroke="#fff" stroke-width="15" opacity=".75" stroke-linecap="round"/>
+<path d="M158 177 Q300 197 442 177 L442 217 Q300 239 158 217Z" fill="#2a6e92" stroke="#172c42" stroke-width="8"/>
+<rect x="214" y="119" width="172" height="93" rx="40" fill="#142e48" stroke="#172c42" stroke-width="7"/>
+<ellipse cx="259" cy="162" rx="16" ry="22" fill="#9ef0e5"/>
+<ellipse cx="341" cy="162" rx="16" ry="22" fill="#9ef0e5"/>
+<circle cx="264" cy="156" r="5" fill="#fff"/><circle cx="346" cy="156" r="5" fill="#fff"/>
+<path d="M281 191 Q300 205 319 191" fill="none" stroke="#93ded9" stroke-width="6" stroke-linecap="round"/>
+<!-- antenna -->
+<path d="M300 55 V26" stroke="#172c42" stroke-width="9" stroke-linecap="round"/>
+<circle cx="300" cy="20" r="14" fill="#ffbf62" stroke="#172c42" stroke-width="7"/>
+<!-- cleaner attachment -->
+<g stroke="#172c42" stroke-linecap="round" stroke-linejoin="round">
+<path d="M300 597 V651" stroke-width="12"/>
+<path d="M243 650 Q300 632 357 650 L380 686 Q300 702 220 686Z" fill="#58b7be" stroke-width="9"/>
+<path d="M217 685 Q300 704 383 685 L396 710 Q300 737 204 710Z" fill="#1d4863" stroke-width="9"/>
+<path d="M218 718 l0 13 M240 722 l0 13 M262 724 l0 13 M284 726 l0 13 M306 726 l0 13 M328 724 l0 13 M350 722 l0 13 M372 718 l0 13" stroke="#66c7c9" stroke-width="6"/>
+</g>
+<!-- little sparkle motifs -->
+<g fill="none" stroke="#66bdc2" stroke-width="7" stroke-linecap="round"><path d="M55 215 v30 M40 230 h30"/><path d="M518 183 v20 M508 193 h20"/></g>
+</svg>

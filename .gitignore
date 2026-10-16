@@ -1,0 +1,11 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+# never commit secrets or captured cloud responses with personal data
+*.local.json
+secrets/
+# Xcode: the project is generated from app/project.yml (xcodegen generate)
+app/build/
+app/DreameMac.xcodeproj/
+xcuserdata/
