@@ -119,6 +119,8 @@ struct PresetEditor: View {
         }
         .formStyle(.grouped)
         .frame(width: 380, height: 520)
+        // Picks up rooms renamed or split in the Dreamehome app since the app connected.
+        .task { await model.loadRooms() }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
