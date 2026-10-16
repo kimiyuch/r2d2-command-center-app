@@ -14,7 +14,7 @@ struct DreameMacApp: App {
             MainView()
                 .environment(model)
         }
-        .defaultSize(width: 440, height: 640)
+        .defaultSize(width: 1100, height: 700)
         .commands {
             RobotCommands(model: model)
         }

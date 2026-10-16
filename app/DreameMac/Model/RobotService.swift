@@ -56,5 +56,6 @@ protocol RobotService: Sendable {
     func status() async throws -> RobotStatus
     func perform(_ command: RobotCommand) async throws
     func rooms() async throws -> [Room]
+    func map() async throws -> RobotMap
     func clean(_ preset: Preset) async throws
 }

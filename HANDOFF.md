@@ -101,8 +101,10 @@ Still open in Phase 1:
 - Push instead of polling: `dreame_vacuum` uses MQTT (`protocol.connect(message_callback=…)`); helper could forward events.
 - Refresh tokens the vendored client renews internally during a long session aren't reported back to the app (password fallback covers it).
 
-**Phase 2: Map & rooms**
-- Port the map decoder, render the map natively (SwiftUI Canvas), pick rooms by click, room cleaning.
+**Phase 2: Map & rooms**: *map done 2026-10-16*
+- Helper `map`: saved map from `dreame_vacuum` (`selected_map.pixel_type`) as one byte per pixel (flipped, cropped to content, rotated by `rotation` like the Dreamehome app), plus room centers and dock in the same pixel coordinates. `status` adds `robot` (live map position, same coordinates).
+- App: `MapView` renders the pixels into a `CGImage` (room colors, edges, selection/hover), overlays names, dock and robot; click toggles rooms. Main window is now two panes: map with a selection bar (mode, "Clean", "Save as Preset…") left, status/presets/controls right. The preset editor also has the map. Polls every 5 s while cleaning (the helper answers from its cache).
+- Not yet: cleaning path, no-go zones/virtual walls, live (uncleaned/cleaned) map during a run, rotating the map in the app.
 
 **Phase 3: Extras**
 - Notifications, dock actions (mop wash, drying, auto-empty), consumables, history.

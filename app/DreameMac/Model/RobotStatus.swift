@@ -36,6 +36,8 @@ struct RobotStatus: Codable, Hashable, Sendable {
     var suction: RobotValue?
     var task: RobotValue?
     var cleaningMode: CleaningMode?
+    /// Robot position on the `RobotMap` image; nil until the map was loaded once.
+    var robot: MapPoint?
 
     var hasError: Bool {
         guard let error else { return false }

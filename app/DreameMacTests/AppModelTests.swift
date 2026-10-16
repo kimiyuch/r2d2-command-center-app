@@ -106,4 +106,24 @@ import Testing
         await model.retry()
         #expect(model.phase == .ready)
     }
+
+    @Test func loadsMapAfterLogin() async {
+        let model = AppModel(service: MockRobotService(), secrets: secrets, defaults: defaults)
+        await model.logIn(user: "me@example.com", password: "secret", country: "eu")
+        #expect(model.map == .mock)
+    }
+
+    @Test func cleansRoomsSelectedOnTheMapInMapOrder() async {
+        let service = MockRobotService()
+        let model = AppModel(service: service, secrets: secrets, defaults: defaults)
+        await model.logIn(user: "me@example.com", password: "secret", country: "eu")
+        model.selectedRoomIDs = [7, 1]
+
+        await model.cleanSelectedRooms(mode: .vacuum)
+        let cleaned = await service.cleanedPresets
+        #expect(cleaned.map(\.roomIDs) == [[1, 7]])
+        #expect(cleaned.first?.mode == .vacuum)
+        #expect(cleaned.first?.name == "Primary Bedroom and Dining Hall")
+        #expect(model.selectedRoomIDs.isEmpty)
+    }
 }

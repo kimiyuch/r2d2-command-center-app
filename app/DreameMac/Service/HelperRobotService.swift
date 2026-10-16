@@ -59,6 +59,12 @@ actor HelperRobotService: RobotService {
         }
     }
 
+    func map() async throws -> RobotMap {
+        try await withSession {
+            try await helper.call("map", params: NoParams(), as: RobotMap.self)
+        }
+    }
+
     func clean(_ preset: Preset) async throws {
         try await withSession {
             _ = try await helper.call("cleanRooms", params: CleanRoomsParams(preset), as: NoParams.self)

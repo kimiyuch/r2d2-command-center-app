@@ -95,7 +95,18 @@ struct PresetEditor: View {
         Form {
             TextField("Name", text: $preset.name, prompt: Text("Kitchen after dinner"))
 
-            Section("Rooms") {
+            if let map = model.map {
+                Section("Rooms (click on the map)") {
+                    MapView(
+                        map: map,
+                        selection: roomSelection,
+                        roomNames: Dictionary(uniqueKeysWithValues: model.rooms.map { ($0.id, $0.name) })
+                    )
+                    .frame(height: 260)
+                }
+            }
+
+            Section(model.map == nil ? "Rooms" : "Or pick from the list") {
                 ForEach(model.rooms) { room in
                     Toggle(room.name, isOn: binding(for: room))
                 }
@@ -118,9 +129,12 @@ struct PresetEditor: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 380, height: 520)
+        .frame(width: 460, height: model.map == nil ? 520 : 760)
         // Picks up rooms renamed or split in the Dreamehome app since the app connected.
-        .task { await model.loadRooms() }
+        .task {
+            await model.loadRooms()
+            await model.loadMap()
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -141,6 +155,14 @@ struct PresetEditor: View {
                     }
                 }
             }
+        }
+    }
+
+    private var roomSelection: Binding<Set<Int>> {
+        Binding {
+            Set(preset.roomIDs)
+        } set: { ids in
+            preset.roomIDs = model.rooms.map(\.id).filter(ids.contains)
         }
     }
 

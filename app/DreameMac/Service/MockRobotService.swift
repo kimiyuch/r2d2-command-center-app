@@ -52,6 +52,10 @@ actor MockRobotService: RobotService {
         Self.rooms
     }
 
+    func map() async throws -> RobotMap {
+        .mock
+    }
+
     func clean(_ preset: Preset) async throws {
         cleanedPresets.append(preset)
         current.state = RobotValue(raw: 1, name: "sweeping")
@@ -82,4 +86,28 @@ final class InMemorySecretStore: SecretStore, @unchecked Sendable {
     func set(_ value: String?, for account: String) {
         lock.withLock { items[account] = value }
     }
+}
+
+extension RobotMap {
+    /// Three rooms side by side (ids 1, 6, 7 like `MockRobotService.rooms`), with edges, 30×10 pixels.
+    static let mock: RobotMap = {
+        let width = 30, height = 10
+        var pixels = [UInt8](repeating: 0, count: width * height)
+        for y in 1..<9 {
+            for x in 1..<29 {
+                let room: UInt8 = x < 10 ? 1 : x < 20 ? 6 : 7
+                let edge = y == 1 || y == 8 || x == 1 || x == 28 || x % 10 == 0
+                pixels[y * width + x] = edge ? room + 100 : room
+            }
+        }
+        return RobotMap(
+            mapID: 1, width: width, height: height, pixels: Data(pixels),
+            rooms: [
+                MapRoom(id: 1, name: "Primary Bedroom", x: 5, y: 5),
+                MapRoom(id: 6, name: "Living Room", x: 15, y: 5),
+                MapRoom(id: 7, name: "Dining Hall", x: 24, y: 5),
+            ],
+            charger: MapPoint(x: 3, y: 7)
+        )
+    }()
 }

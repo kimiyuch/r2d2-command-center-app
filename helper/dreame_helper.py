@@ -11,6 +11,10 @@ Methods:
   status      {}                                        -> {state, error, battery, charging, status, suction, task, cleaningMode}
   action      {name: start|pause|stop|dock|locate}      -> {}
   rooms       {}                                        -> [{id, name, type}]
+  map         {}                                        -> {mapID, width, height, pixels, rooms: [{id, name, x, y}], charger}
+              pixels: base64 uint8 per pixel, row-major from the top-left, already rotated like the Dreame app.
+              Values: 0 outside, 1-63 floor of that room, 101-163 that room's edge, 254/253 floor without room.
+              status then also contains `robot: {x, y}` in the same image coordinates.
   cleanRooms  {rooms: [id], mode?, suction?, repeats?}  -> {}
               mode: vacuum|mop|vacuum_and_mop|mop_after_vacuum, suction: quiet|standard|strong|turbo
 
@@ -21,6 +25,7 @@ Secrets only ever arrive over stdin; the app owns the Keychain. stdout is reserv
 all logging goes to stderr.
 """
 
+import base64
 import json
 import logging
 import sys
@@ -30,6 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 
+import numpy as np  # noqa: E402
 from dreame.device import DreameVacuumDevice  # noqa: E402
 from dreame.exceptions import DeviceException  # noqa: E402
 from dreame.protocol import DreameVacuumDreameHomeCloudProtocol  # noqa: E402
@@ -134,6 +140,28 @@ def choice(table: dict, key: str | None, what: str):
     return table[key]
 
 
+class MapTransform:
+    """World coordinates (mm) -> pixel coordinates of the image sent by `map` (flipped, cropped, rotated)."""
+
+    def __init__(self, dimensions, crop_x: int, crop_y: int, width: int, height: int, quarter_turns: int) -> None:
+        self.dimensions = dimensions
+        self.crop_x = crop_x
+        self.crop_y = crop_y
+        self.width = width  # before rotating
+        self.height = height
+        self.quarter_turns = quarter_turns
+
+    def __call__(self, point) -> dict:
+        d = self.dimensions
+        x = (point.x - d.left) / d.grid_size - self.crop_x
+        y = ((d.height * d.grid_size - 1) - (point.y - d.top)) / d.grid_size - self.crop_y
+        width, height = self.width, self.height
+        for _ in range(self.quarter_turns):  # same as np.rot90: counterclockwise
+            x, y = y, width - 1 - x
+            width, height = height, width
+        return {"x": round(x, 1), "y": round(y, 1)}
+
+
 class Session:
     def __init__(self) -> None:
         self.credentials: dict | None = None
@@ -141,6 +169,7 @@ class Session:
         self.devices: list[dict] = []
         self.device: DreameVacuumDevice | None = None
         self.summary: dict | None = None
+        self.map_transform: MapTransform | None = None
 
     def login(self, user: str, country: str, password: str | None = None, refreshToken: str | None = None) -> dict:
         self._disconnect()
@@ -202,6 +231,9 @@ class Session:
                 status[key] = value
             else:
                 status[key] = enum_value(value, enum)
+        current_map = device.status.current_map
+        robot = current_map.robot_position if current_map else None
+        status["robot"] = self.map_transform(robot) if robot and self.map_transform else None
         return status
 
     def action(self, name: str) -> dict:
@@ -220,6 +252,38 @@ class Session:
             {"id": int(segment_id), "name": segment.custom_name or segment.name or f"Room {segment_id}", "type": segment.type}
             for segment_id, segment in sorted(segments.items())
         ]
+
+    def map(self) -> dict:
+        device = self._device()
+        deadline = time.monotonic() + ROOMS_TIMEOUT
+        while not (device.status.selected_map and device.status.selected_map.pixel_type is not None):
+            if time.monotonic() > deadline:
+                raise HelperError("request_failed", "The map isn't available yet")
+            time.sleep(0.5)
+        saved = device.status.selected_map
+
+        # pixel_type is indexed [x, y] with y pointing up; the image wants rows from the top.
+        image = saved.pixel_type[:, ::-1].T
+        filled = np.argwhere(image != 0)
+        (top, left), (bottom, right) = filled.min(axis=0), filled.max(axis=0)
+        image = image[top : bottom + 1, left : right + 1]
+        quarter_turns = (int(saved.rotation or 0) // 90) % 4
+        transform = MapTransform(saved.dimensions, int(left), int(top), image.shape[1], image.shape[0], quarter_turns)
+        image = np.ascontiguousarray(np.rot90(image, quarter_turns), dtype=np.uint8)
+        self.map_transform = transform
+
+        rooms = []
+        for segment_id, segment in sorted((saved.segments or {}).items()):
+            center = transform(type("P", (), {"x": segment.x, "y": segment.y})) if segment.x is not None else None
+            rooms.append({"id": int(segment_id), "name": segment.custom_name or segment.name, **(center or {})})
+        return {
+            "mapID": saved.map_id,
+            "width": image.shape[1],
+            "height": image.shape[0],
+            "pixels": base64.b64encode(image.tobytes()).decode(),
+            "rooms": rooms,
+            "charger": transform(saved.charger_position) if saved.charger_position else None,
+        }
 
     def cleanRooms(self, rooms: list[int], mode: str | None = None, suction: str | None = None, repeats: int = 1) -> dict:
         device = self._device()
@@ -266,6 +330,7 @@ def handle(session: Session, request: dict):
         "status": session.status,
         "action": session.action,
         "rooms": session.rooms,
+        "map": session.map,
         "cleanRooms": session.cleanRooms,
     }
     method = methods.get(request.get("method"))

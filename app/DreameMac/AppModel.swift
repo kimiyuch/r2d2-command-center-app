@@ -15,6 +15,8 @@ final class AppModel {
     }
 
     static let pollInterval: Duration = .seconds(20)
+    /// Faster while cleaning so the robot moves on the map. Cheap: the helper answers from its own cache.
+    static let activePollInterval: Duration = .seconds(5)
     static let offlineRetryInterval: Duration = .seconds(60)
     static let refreshDelayAfterCommand: Duration = .seconds(2)
 
@@ -24,6 +26,9 @@ final class AppModel {
     private(set) var lastUpdated: Date?
     private(set) var commandInFlight: RobotCommand?
     private(set) var rooms: [Room] = []
+    private(set) var map: RobotMap?
+    /// Rooms picked on the map in the main window, for a one-off room cleaning.
+    var selectedRoomIDs: Set<Int> = []
     private(set) var presets: [Preset]
     private(set) var presetInFlight: Preset.ID?
     /// Last error from a login attempt, refresh or command. Cleared by the next success.
@@ -106,6 +111,8 @@ final class AppModel {
         device = nil
         status = nil
         rooms = []
+        map = nil
+        selectedRoomIDs = []
         lastUpdated = nil
         errorMessage = nil
         phase = .loggedOut
@@ -163,8 +170,34 @@ final class AppModel {
     func loadRooms() async {
         do {
             rooms = try await service.rooms()
+            selectedRoomIDs.formIntersection(rooms.map(\.id))
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadMap() async {
+        do {
+            map = try await service.map()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Ad-hoc job for the rooms selected on the map, in map order.
+    func selectionPreset(mode: CleaningModeOption?) -> Preset {
+        let ids = rooms.map(\.id).filter(selectedRoomIDs.contains)
+        return Preset(name: ids.map { id in rooms.first { $0.id == id }?.name ?? "" }.formatted(.list(type: .and)),
+                      roomIDs: ids, mode: mode)
+    }
+
+    func cleanSelectedRooms(mode: CleaningModeOption?) async {
+        guard !selectedRoomIDs.isEmpty else { return }
+        do {
+            try await run(selectionPreset(mode: mode))
+            selectedRoomIDs = []
+        } catch {
+            // run() already set errorMessage.
         }
     }
 
@@ -239,6 +272,8 @@ final class AppModel {
             phase = .ready
             await refresh()
             await loadRooms()
+            await loadMap()
+            await refresh()  // now with the robot's position on the map
             startPolling()
         } catch RobotError.robotOffline(let message) {
             phase = .offline(message)
@@ -260,7 +295,8 @@ final class AppModel {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: Self.pollInterval)
+                let interval = self?.status?.isCleaning == true ? Self.activePollInterval : Self.pollInterval
+                try? await Task.sleep(for: interval)
                 guard !Task.isCancelled else { return }
                 await self?.refresh()
             }

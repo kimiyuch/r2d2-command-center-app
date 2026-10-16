@@ -39,7 +39,7 @@ struct MainView: View {
                 RobotView()
             }
         }
-        .frame(minWidth: 400, minHeight: 520)
+        .frame(minWidth: 820, minHeight: 560)
     }
 }
 
@@ -47,6 +47,16 @@ struct RobotView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        HStack(spacing: 0) {
+            MapPanel()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Divider()
+            sidebar
+                .frame(width: 360)
+        }
+    }
+
+    private var sidebar: some View {
         VStack(alignment: .leading, spacing: 20) {
             header
             if let status = model.status {
@@ -137,6 +147,73 @@ struct RobotArtwork: View {
             .scaledToFit()
             .frame(height: height)
             .accessibilityHidden(true)
+    }
+}
+
+/// The map with click-to-select rooms and a bar to clean the selection or save it as a preset.
+struct MapPanel: View {
+    @Environment(AppModel.self) private var model
+    @State private var mode: CleaningModeOption? = .vacuum
+    @State private var newPreset: Preset?
+
+    var body: some View {
+        @Bindable var model = model
+        VStack(spacing: 12) {
+            if let map = model.map {
+                MapView(
+                    map: map,
+                    selection: $model.selectedRoomIDs,
+                    robot: model.status?.robot,
+                    roomNames: Dictionary(uniqueKeysWithValues: model.rooms.map { ($0.id, $0.name) })
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ProgressView("Loading map…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            selectionBar
+        }
+        .padding(20)
+        .background(.background.secondary)
+        .sheet(item: $newPreset) { preset in
+            PresetEditor(preset: preset, isNew: true)
+        }
+    }
+
+    private var selectionBar: some View {
+        HStack {
+            if model.selectedRoomIDs.isEmpty {
+                Text("Click rooms on the map to clean them.")
+                    .foregroundStyle(.secondary)
+                Spacer()
+            } else {
+                let preset = model.selectionPreset(mode: mode)
+                Text(preset.name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Picker("Mode", selection: $mode) {
+                    Text("Current setting").tag(CleaningModeOption?.none)
+                    ForEach(CleaningModeOption.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(Optional(mode))
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+                Button("Save as Preset…") {
+                    newPreset = Preset(name: "", roomIDs: preset.roomIDs, mode: mode)
+                }
+                Button("Clear") { model.selectedRoomIDs = [] }
+                Button {
+                    Task { await model.cleanSelectedRooms(mode: mode) }
+                } label: {
+                    Label("Clean", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(model.phase != .ready || model.isBusy)
+            }
+        }
+        .frame(minHeight: 28)
     }
 }
 
