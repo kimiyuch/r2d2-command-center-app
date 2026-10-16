@@ -98,6 +98,7 @@ Still open in Phase 1:
 - Robot's own Dreamehome "shortcuts" (the log shows `SHORTCUTS GET_COMMANDS`, ids 32/33) could be offered as presets too.
 - Time-based ("after dinner"): via macOS Shortcuts automations or the robot's own schedules; not built into the app.
 - Optionally global hotkeys.
+- **Voice (2026-10-16, parked):** a Shortcuts shortcut named after a phrase ("Die Küche du putzen musst") with "Run Cleaning Preset" works when Siri runs it (preset started once via Siri at 18:29). But Siri on the user's Mac (German (Switzerland), Apple Intelligence beta) is unreliable, and phrases containing "putzen"/"saugen" get routed to Apple Home robot vacuums ("Das Gerät Wohnzimmer reagiert nicht"). Alternatives suggested: a phrase without cleaning verbs, macOS Voice Control custom commands (run shortcut), or a keyboard shortcut. App Shortcut phrases in `RobotShortcuts` are English only.
 - Push instead of polling: `dreame_vacuum` uses MQTT (`protocol.connect(message_callback=…)`); helper could forward events.
 - Refresh tokens the vendored client renews internally during a long session aren't reported back to the app (password fallback covers it).
 
