@@ -160,29 +160,36 @@ struct MapPanel: View {
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 12) {
-            HStack {
-                Spacer()
-                if !isEditingFloorPlan {
-                    Button("Edit Floor Plan", systemImage: "pencil.and.ruler") {
-                        model.selectedRoomIDs = []
-                        isEditingFloorPlan = true
-                    }
-                    .disabled(model.map == nil)
+            Group {
+                if let map = model.map {
+                    MapView(
+                        map: map,
+                        selection: isEditingFloorPlan ? nil : $model.selectedRoomIDs,
+                        robot: model.status?.robot,
+                        roomNames: Dictionary(uniqueKeysWithValues: model.rooms.map { ($0.id, $0.name) }),
+                        editRects: isEditingFloorPlan ? { model.setRoomRects($0) } : nil
+                    )
+                } else {
+                    ProgressView("Loading map…")
                 }
             }
-            .frame(minHeight: 22)
-            if let map = model.map {
-                MapView(
-                    map: map,
-                    selection: isEditingFloorPlan ? nil : $model.selectedRoomIDs,
-                    robot: model.status?.robot,
-                    roomNames: Dictionary(uniqueKeysWithValues: model.rooms.map { ($0.id, $0.name) }),
-                    editRects: isEditingFloorPlan ? { model.setRoomRects($0) } : nil
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ProgressView("Loading map…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .bottomTrailing) {
+                if !isEditingFloorPlan && model.map != nil {
+                    Button {
+                        model.selectedRoomIDs = []
+                        isEditingFloorPlan = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 32, height: 32)
+                            .background(.regularMaterial, in: .circle)
+                            .shadow(radius: 1.5)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Edit Floor Plan")
+                    .accessibilityLabel("Edit Floor Plan")
+                }
             }
             if isEditingFloorPlan {
                 editBar
