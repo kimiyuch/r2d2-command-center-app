@@ -6,7 +6,6 @@ import Testing
     @Test func decodesHelperFloorPlan() throws {
         let json = """
         {"mapID": 1, "width": 20, "height": 10,
-         "outline": [[0, 0, 20, 0, 20, 10, 0, 10]],
          "rooms": [{"id": 7, "name": "Kitchen/Dining Room", "x": 5, "y": 5, "area": 20.5,
                     "outline": [[0, 0, 10, 0, 10, 10, 0, 10], [3, 3, 6, 3, 6, 6, 3, 6]]},
                    {"id": 1, "name": "Miyu", "x": 15, "y": 5, "area": 12.4, "outline": [[10, 0, 20, 0, 20, 10, 10, 10]]}],

@@ -1,13 +1,12 @@
 import Foundation
 
-/// Clean floor plan of the saved map, as computed by the helper (`floorplan.py`): one outline for the
-/// home and one per room, in pixel coordinates of the map as rotated in the Dreamehome app. Robot and
-/// dock positions use the same coordinates.
+/// Clean floor plan of the saved map, as computed by the helper (`floorplan.py`): one outline per room
+/// (a rectangle where it fits), in pixel coordinates of the map as rotated in the Dreamehome app. Robot
+/// and dock positions use the same coordinates. The home's outline is the union of the rooms.
 struct RobotMap: Codable, Hashable, Sendable {
     let mapID: Int
     let width: Int
     let height: Int
-    let outline: [MapRing]
     let rooms: [MapRoom]
     let charger: MapPoint?
 

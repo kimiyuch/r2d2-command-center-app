@@ -11,9 +11,10 @@ Methods:
   status      {}                                        -> {state, error, battery, charging, status, suction, task, cleaningMode}
   action      {name: start|pause|stop|dock|locate}      -> {}
   rooms       {}                                        -> [{id, name, type}]
-  map         {}                                        -> {mapID, width, height, outline, rooms: [{id, name, x, y, area, outline}], charger}
+  map         {}                                        -> {mapID, width, height, rooms: [{id, name, x, y, area, outline}], charger}
               Clean vector floor plan (see floorplan.py) in pixel coordinates of the map as rotated in the Dreame app.
               outline: list of rings [x0, y0, x1, y1, ...], filled with the even-odd rule (holes included).
+              Rooms are rectangles where they fit (see floorplan.py); the home outline is their union.
               area in m². status then also contains `robot: {x, y}` in the same coordinates.
   cleanRooms  {rooms: [id], mode?, suction?, repeats?}  -> {}
               mode: vacuum|mop|vacuum_and_mop|mop_after_vacuum, suction: quiet|standard|strong|turbo
@@ -279,7 +280,7 @@ class Session:
         square_meters_per_pixel = (saved.dimensions.grid_size / 1000) ** 2
         rooms = []
         for segment_id, segment in sorted(segments.items()):
-            room = plan["rooms"].get(int(segment_id))
+            room = plan.get(int(segment_id))
             if room is None:
                 continue
             x, y = room["center"]
@@ -295,7 +296,6 @@ class Session:
             "mapID": saved.map_id,
             "width": image.shape[1],
             "height": image.shape[0],
-            "outline": plan["outline"],
             "rooms": rooms,
             "charger": transform(saved.charger_position) if saved.charger_position else None,
         }

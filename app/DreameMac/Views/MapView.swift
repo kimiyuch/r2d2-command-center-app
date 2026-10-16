@@ -59,13 +59,13 @@ struct MapView: View {
     }
 
     private func draw(in context: inout GraphicsContext, layout: Layout) {
-        let home = layout.path(map.outline)
+        let home = map.rooms.reduce(Path()) { $0.union(layout.path($1.outline), eoFill: true) }
         let floor = colorScheme == .dark ? Color(white: 0.17) : .white
         let wallWidth = max(2, layout.scale * 0.9)
 
         var shadow = context
         shadow.addFilter(.shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.12), radius: 10, y: 4))
-        shadow.fill(home, with: .color(floor), style: FillStyle(eoFill: true))
+        shadow.fill(home, with: .color(floor))
 
         for room in map.rooms {
             let path = layout.path(room.outline)
