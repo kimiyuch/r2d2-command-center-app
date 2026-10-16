@@ -68,7 +68,7 @@ actor HelperProcess {
         let stdout = Pipe()
         process.standardInput = stdin
         process.standardOutput = stdout
-        process.standardError = FileHandle.standardError
+        process.standardError = Self.logFile() ?? FileHandle.standardError
 
         let processID = ObjectIdentifier(process)
         process.terminationHandler = { [weak self] _ in
@@ -104,6 +104,19 @@ actor HelperProcess {
                 }
             }
         }
+    }
+
+    /// Helper log (commands sent to the robot, errors): ~/Library/Logs/R2D2 Command Center/helper.log
+    private static func logFile() -> FileHandle? {
+        let directory = URL.libraryDirectory.appending(path: "Logs/\(AppInfo.name)")
+        let url = directory.appending(path: "helper.log")
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            FileManager.default.createFile(atPath: url.path, contents: nil)
+        }
+        guard let handle = try? FileHandle(forWritingTo: url) else { return nil }
+        _ = try? handle.seekToEnd()
+        return handle
     }
 
     private func receive(_ data: Data) {

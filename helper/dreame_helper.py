@@ -279,7 +279,11 @@ def handle(session: Session, request: dict):
 
 
 def main() -> None:
-    logging.basicConfig(stream=sys.stderr, level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(stream=sys.stderr, level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # Commands sent to the robot ("Send action ...") and our own request log. The protocol logger stays
+    # at WARNING; it deals with tokens.
+    for name in ("dreame_helper", "dreame.device"):
+        logging.getLogger(name).setLevel(logging.INFO)
     session = Session()
     try:
         for line in sys.stdin:
@@ -289,10 +293,14 @@ def main() -> None:
             try:
                 request = json.loads(line)
                 request_id = request.get("id")
+                method = request.get("method")
+                # Never log login params (password, refresh token).
+                _LOGGER.info("Request %s %s", method, "" if method == "login" else request.get("params") or "")
                 response = {"id": request_id, "result": handle(session, request)}
             except json.JSONDecodeError as ex:
                 response = {"id": None, "error": {"code": "invalid_request", "message": f"Invalid JSON: {ex}"}}
             except HelperError as ex:
+                _LOGGER.warning("Request failed: %s %s", ex.code, ex)
                 response = {"id": request_id, "error": {"code": ex.code, "message": str(ex)}}
             except Exception as ex:
                 _LOGGER.exception("Request failed")

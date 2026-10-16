@@ -93,8 +93,8 @@ Done:
 Still open in Phase 1:
 - Status details: water tank, dust bin, mop installed; suction/mop modes as settable controls.
 - **Offline handling** (2026-10-16): the robot was briefly unreachable via the cloud (error 80001 "设备可能不在线" = "device may be offline"), even though the cloud's `online` flag sometimes said `true`. The helper therefore reports `robot_offline` both when `online == false` and when connecting fails with `cloud_unreachable`. The app shows an offline state and checks again every 60 s.
-- **Room cleaning not yet tested live** (`cleanRooms`: set cleaning mode, then `clean_segment`).
-- First user example: "Kitchen after dinner, vacuum only". **The map has no kitchen** (rooms: Primary Bedroom ×3, Corridor, Bathroom ×2, Living Room, Dining Hall; segment 4 missing). Clarify with the user: is the kitchen part of "Dining Hall", or does the map need splitting/renaming in the Dreamehome app?
+- **Room cleaning works live** (2026-10-16): preset "Kitchen after dinner" → room 7 ("Kitchen/Dining Room", renamed in the Dreamehome app), vacuum only. Earlier "wrong room" reports: same command; the robot passes through other rooms (e.g. "Miyu") on the way to the kitchen, and one run was a normal "Cleaning" rather than a preset. Helper log: `~/Library/Logs/R2D2 Command Center/helper.log` (requests + commands sent to the robot + status changes; no login params).
+- Room names come from the Dreamehome app (custom names), otherwise from the robot's room-type guess (often wrong). The Dreamehome app numbers rooms differently from the internal segment IDs; always go by names.
 - Robot's own Dreamehome "shortcuts" (the log shows `SHORTCUTS GET_COMMANDS`, ids 32/33) could be offered as presets too.
 - Time-based ("after dinner"): via macOS Shortcuts automations or the robot's own schedules; not built into the app.
 - Optionally global hotkeys.
