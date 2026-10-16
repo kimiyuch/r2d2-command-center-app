@@ -126,4 +126,22 @@ import Testing
         #expect(cleaned.first?.name == "Primary Bedroom and Dining Hall")
         #expect(model.selectedRoomIDs.isEmpty)
     }
+
+    @Test func floorPlanEditsPersistAndReset() async {
+        let model = AppModel(service: MockRobotService(), secrets: secrets, defaults: defaults)
+        await model.logIn(user: "me@example.com", password: "secret", country: "eu")
+        var rects = model.roomRects
+        rects[7]?.y1 = 12
+        model.setRoomRects(rects)
+        #expect(model.floorPlanEdits.keys.sorted() == [7])  // only the changed room is stored
+        #expect(model.map?.rooms.first { $0.id == 7 }?.rect?.y1 == 12)
+
+        let relaunched = AppModel(service: MockRobotService(), secrets: secrets, defaults: defaults)
+        await relaunched.logIn(user: "me@example.com", password: "secret", country: "eu")
+        #expect(relaunched.floorPlanEdits[7]?.y1 == 12)
+
+        relaunched.resetRoom(7)
+        #expect(relaunched.floorPlanEdits.isEmpty)
+        #expect(relaunched.map == RobotMap.mock)
+    }
 }

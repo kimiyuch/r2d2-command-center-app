@@ -26,7 +26,12 @@ final class AppModel {
     private(set) var lastUpdated: Date?
     private(set) var commandInFlight: RobotCommand?
     private(set) var rooms: [Room] = []
-    private(set) var map: RobotMap?
+    /// The floor plan as computed by the helper, before the user's corrections.
+    private(set) var rawMap: RobotMap?
+    /// The user's corrections to `rawMap`: room id -> rectangle.
+    private(set) var floorPlanEdits: [Int: MapRect] = [:]
+    /// The floor plan as shown: `rawMap` with `floorPlanEdits` applied.
+    var map: RobotMap? { rawMap?.applying(floorPlanEdits) }
     /// Rooms picked on the map in the main window, for a one-off room cleaning.
     var selectedRoomIDs: Set<Int> = []
     private(set) var presets: [Preset]
@@ -38,6 +43,7 @@ final class AppModel {
     private let secrets: any SecretStore
     private let defaults: UserDefaults
     private let presetStore: PresetStore
+    private let floorPlanStore: FloorPlanStore
     private var started = false
     private var pollTask: Task<Void, Never>?
     private var offlineRetryTask: Task<Void, Never>?
@@ -47,6 +53,7 @@ final class AppModel {
         self.secrets = secrets
         self.defaults = defaults
         presetStore = PresetStore(defaults: defaults)
+        floorPlanStore = FloorPlanStore(defaults: defaults)
         presets = presetStore.load()
     }
 
@@ -111,7 +118,8 @@ final class AppModel {
         device = nil
         status = nil
         rooms = []
-        map = nil
+        rawMap = nil
+        floorPlanEdits = [:]
         selectedRoomIDs = []
         lastUpdated = nil
         errorMessage = nil
@@ -178,10 +186,37 @@ final class AppModel {
 
     func loadMap() async {
         do {
-            map = try await service.map()
+            let map = try await service.map()
+            rawMap = map
+            floorPlanEdits = floorPlanStore.edits(forMap: map.mapID)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Room rectangles as currently shown (only rooms whose outline is a rectangle can be edited).
+    var roomRects: [Int: MapRect] {
+        Dictionary(uniqueKeysWithValues: (map?.rooms ?? []).compactMap { room in room.rect.map { (room.id, $0) } })
+    }
+
+    func setRoomRects(_ rects: [Int: MapRect]) {
+        guard let rawMap else { return }
+        let original = Dictionary(uniqueKeysWithValues: rawMap.rooms.compactMap { room in room.rect.map { (room.id, $0) } })
+        // Only store what differs from the automatic plan, so improvements to it still show up elsewhere.
+        floorPlanEdits = rects.filter { original[$0.key] != $0.value }
+        floorPlanStore.save(floorPlanEdits, forMap: rawMap.mapID)
+    }
+
+    func resetRoom(_ id: Int) {
+        var rects = roomRects
+        if let original = rawMap?.rooms.first(where: { $0.id == id })?.rect { rects[id] = original }
+        setRoomRects(rects)
+    }
+
+    func resetFloorPlan() {
+        guard let rawMap else { return }
+        floorPlanEdits = [:]
+        floorPlanStore.save([:], forMap: rawMap.mapID)
     }
 
     /// Ad-hoc job for the rooms selected on the map, in map order.

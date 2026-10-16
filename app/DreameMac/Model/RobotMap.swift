@@ -7,7 +7,9 @@ struct RobotMap: Codable, Hashable, Sendable {
     let mapID: Int
     let width: Int
     let height: Int
-    let rooms: [MapRoom]
+    /// Meters per pixel (5 cm on the X50).
+    var resolution: Double = 0.05
+    var rooms: [MapRoom]
     let charger: MapPoint?
 
     /// The room containing a point, if any.
@@ -20,11 +22,19 @@ struct MapRoom: Codable, Hashable, Sendable, Identifiable {
     let id: Int
     let name: String
     /// Label position: the point deepest inside the room.
-    let x: Double
-    let y: Double
+    var x: Double
+    var y: Double
     /// Floor area in m².
-    let area: Double
-    let outline: [MapRing]
+    var area: Double
+    var outline: [MapRing]
+
+    /// The room as a rectangle, if its outline is one (the helper fits rooms as rectangles where it can).
+    var rect: MapRect? {
+        guard outline.count == 1, let ring = outline.first, ring.points.count == 4 else { return nil }
+        let xs = Set(ring.points.map(\.x)), ys = Set(ring.points.map(\.y))
+        guard xs.count == 2, ys.count == 2 else { return nil }
+        return MapRect(x0: xs.min()!, y0: ys.min()!, x1: xs.max()!, y1: ys.max()!)
+    }
 
     /// Even-odd rule over all rings, so holes don't count.
     func contains(_ point: MapPoint) -> Bool {
@@ -63,6 +73,38 @@ struct MapRing: Codable, Hashable, Sendable {
             j = i
         }
         return inside
+    }
+}
+
+extension RobotMap {
+    /// The map with the user's corrections (room rectangles) applied.
+    func applying(_ edits: [Int: MapRect]) -> RobotMap {
+        var map = self
+        for index in map.rooms.indices {
+            guard let rect = edits[map.rooms[index].id] else { continue }
+            map.rooms[index].outline = [rect.ring]
+            map.rooms[index].x = (rect.x0 + rect.x1) / 2
+            map.rooms[index].y = (rect.y0 + rect.y1) / 2
+            map.rooms[index].area = rect.width * rect.height * resolution * resolution
+        }
+        return map
+    }
+}
+
+/// Axis-aligned rectangle in map coordinates.
+struct MapRect: Codable, Hashable, Sendable {
+    var x0: Double
+    var y0: Double
+    var x1: Double
+    var y1: Double
+
+    var width: Double { x1 - x0 }
+    var height: Double { y1 - y0 }
+
+    var ring: MapRing {
+        MapRing(points: [
+            MapPoint(x: x0, y: y0), MapPoint(x: x1, y: y0), MapPoint(x: x1, y: y1), MapPoint(x: x0, y: y1),
+        ])
     }
 }
 

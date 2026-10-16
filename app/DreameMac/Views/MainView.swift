@@ -155,29 +155,69 @@ struct MapPanel: View {
     @Environment(AppModel.self) private var model
     @State private var mode: CleaningModeOption? = .vacuum
     @State private var newPreset: Preset?
+    @State private var isEditingFloorPlan = false
 
     var body: some View {
         @Bindable var model = model
         VStack(spacing: 12) {
+            HStack {
+                Spacer()
+                if !isEditingFloorPlan {
+                    Button("Edit Floor Plan", systemImage: "pencil.and.ruler") {
+                        model.selectedRoomIDs = []
+                        isEditingFloorPlan = true
+                    }
+                    .disabled(model.map == nil)
+                }
+            }
+            .frame(minHeight: 22)
             if let map = model.map {
                 MapView(
                     map: map,
-                    selection: $model.selectedRoomIDs,
+                    selection: isEditingFloorPlan ? nil : $model.selectedRoomIDs,
                     robot: model.status?.robot,
-                    roomNames: Dictionary(uniqueKeysWithValues: model.rooms.map { ($0.id, $0.name) })
+                    roomNames: Dictionary(uniqueKeysWithValues: model.rooms.map { ($0.id, $0.name) }),
+                    editRects: isEditingFloorPlan ? { model.setRoomRects($0) } : nil
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ProgressView("Loading map…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            selectionBar
+            if isEditingFloorPlan {
+                editBar
+            } else {
+                selectionBar
+            }
         }
         .padding(20)
         .background(.background.secondary)
         .sheet(item: $newPreset) { preset in
             PresetEditor(preset: preset, isNew: true)
         }
+    }
+
+    private var editBar: some View {
+        HStack {
+            Text("Drag the handles to move walls; flush walls move together. Hold ⌥ to move just one room's side.")
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            Spacer()
+            Menu("Reset") {
+                let edited = model.rooms.filter { model.floorPlanEdits[$0.id] != nil }
+                ForEach(edited) { room in
+                    Button(room.name) { model.resetRoom(room.id) }
+                }
+                if !edited.isEmpty { Divider() }
+                Button("All Rooms", role: .destructive) { model.resetFloorPlan() }
+            }
+            .fixedSize()
+            .disabled(model.floorPlanEdits.isEmpty)
+            Button("Done") { isEditingFloorPlan = false }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+        }
+        .frame(minHeight: 28)
     }
 
     private var selectionBar: some View {

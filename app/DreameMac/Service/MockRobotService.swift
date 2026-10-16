@@ -98,7 +98,7 @@ extension RobotMap {
             mapID: 1, width: 30, height: 10,
             rooms: [
                 MapRoom(id: 1, name: "Primary Bedroom", x: 5, y: 5, area: 4, outline: [rect(0, 0, 10, 10)]),
-                MapRoom(id: 6, name: "Living Room", x: 15, y: 5, area: 4, outline: [rect(10, 0, 20, 10), rect(13, 3, 17, 7)]),
+                MapRoom(id: 6, name: "Living Room", x: 15, y: 5, area: 4, outline: [rect(10, 0, 20, 10)]),
                 MapRoom(id: 7, name: "Dining Hall", x: 25, y: 5, area: 4, outline: [rect(20, 0, 30, 10)]),
             ],
             charger: MapPoint(x: 3, y: 7)
