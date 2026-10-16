@@ -73,16 +73,17 @@ struct MapView: View {
     }
 
     private func draw(in context: inout GraphicsContext, layout: Layout) {
-        let home = map.rooms.reduce(Path()) { $0.union(layout.path($1.outline), eoFill: true) }
         let floor = colorScheme == .dark ? Color(white: 0.17) : .white
         let wallWidth = max(2, layout.scale * 0.9)
+        let roomPaths = map.rooms.map { layout.path($0.outline) }
 
-        var shadow = context
-        shadow.addFilter(.shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.12), radius: 10, y: 4))
-        shadow.fill(home, with: .color(floor))
+        // Soft shadow under the whole home (one layer, so overlapping rooms don't double it).
+        context.drawLayer { layer in
+            layer.addFilter(.shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.12), radius: 10, y: 4))
+            for path in roomPaths { layer.fill(path, with: .color(floor), style: FillStyle(eoFill: true)) }
+        }
 
-        for room in map.rooms {
-            let path = layout.path(room.outline)
+        for (room, path) in zip(map.rooms, roomPaths) {
             let selected = selection?.wrappedValue.contains(room.id) == true
             let tint = Self.palette[room.id % Self.palette.count]
             context.fill(path, with: .color(selected ? .accentColor.opacity(0.75) : tint.opacity(0.22)), style: FillStyle(eoFill: true))
@@ -90,48 +91,60 @@ struct MapView: View {
                 context.fill(path, with: .color(.accentColor.opacity(0.18)), style: FillStyle(eoFill: true))
             }
         }
-        // Interior walls: thin floor-colored lines where rooms meet; then the exterior wall on top.
-        for room in map.rooms {
-            context.stroke(layout.path(room.outline), with: .color(floor), style: StrokeStyle(lineWidth: wallWidth * 0.6, lineJoin: .round))
+        // Interior walls: thin floor-colored lines where rooms meet.
+        for path in roomPaths {
+            context.stroke(path, with: .color(floor), style: StrokeStyle(lineWidth: wallWidth * 0.6, lineJoin: .round))
         }
-        context.stroke(home, with: .color(.primary.opacity(0.8)), style: StrokeStyle(lineWidth: wallWidth, lineJoin: .round))
+        // Exterior walls: every part of a room wall without a neighbor on the other side. Rooms that
+        // aren't rectangles (traced outlines) get their whole outline.
+        var exterior = Path()
+        let rects = Dictionary(uniqueKeysWithValues: map.rooms.compactMap { room in room.rect.map { (room.id, $0) } })
+        for segment in FloorPlanEditing.segments(in: rects) where !segment.isShared {
+            let (a, b) = segment.endpoints
+            exterior.move(to: layout.point(a.x, a.y))
+            exterior.addLine(to: layout.point(b.x, b.y))
+        }
+        for (room, path) in zip(map.rooms, roomPaths) where room.rect == nil {
+            exterior.addPath(path)
+        }
+        context.stroke(exterior, with: .color(.primary.opacity(0.8)), style: StrokeStyle(lineWidth: wallWidth, lineCap: .square, lineJoin: .miter))
     }
 
     private static let space = "map"
 
     private struct WallHandle: Identifiable {
         let id: String
-        let roomID: Int
-        let edge: RectEdge
-        let line: Double
-        let middle: Double
+        let segment: WallSegment
+        /// Walls that move when this handle is dragged; the first is the segment's own.
+        let walls: [(Int, RectEdge)]
+
+        var length: Double { segment.length }
     }
 
-    /// One handle per wall; a wall shared by two rooms gets a single handle in the middle of the shared
-    /// part. Dragging moves the wall (and walls flush with it).
+    /// One handle per wall segment. A shared segment moves every wall flush with it (so rooms stay
+    /// flush); an exterior segment moves only its room's wall. ⌥ always moves just the one room's wall.
     private func wallHandles(layout: Layout) -> some View {
         let rects = Dictionary(uniqueKeysWithValues: map.rooms.compactMap { room in room.rect.map { (room.id, $0) } })
         var handles: [WallHandle] = []
-        var seen = Set<String>()
-        for (id, rect) in rects.sorted(by: { $0.key < $1.key }) {
-            for edge in RectEdge.allCases {
-                let walls = FloorPlanEditing.linkedEdges(of: id, edge, in: rects)
+        var sharedGroups: [String: Int] = [:]  // linked walls -> index in handles
+        for segment in FloorPlanEditing.segments(in: rects) where segment.length >= 2 {
+            if segment.isShared {
+                let walls = FloorPlanEditing.linkedEdges(of: segment.roomID, segment.edge, in: rects)
                 let key = walls.map { "\($0.0)-\($0.1)" }.sorted().joined(separator: ",")
-                guard seen.insert(key).inserted else { continue }
-                // Place the handle on the longest room edge of the wall, in its middle.
-                let (longestID, longestEdge) = walls.max { a, b in
-                    let sa = a.1.span(of: rects[a.0]!), sb = b.1.span(of: rects[b.0]!)
-                    return sa.upperBound - sa.lowerBound < sb.upperBound - sb.lowerBound
-                }!
-                let span = longestEdge.span(of: rects[longestID]!)
-                handles.append(WallHandle(
-                    id: key, roomID: id, edge: edge, line: edge.value(of: rect),
-                    middle: (span.lowerBound + span.upperBound) / 2
-                ))
+                // One handle per straight wall, on its longest shared stretch.
+                if let index = sharedGroups[key] {
+                    if segment.length > handles[index].length { handles[index] = WallHandle(id: key, segment: segment, walls: walls) }
+                } else {
+                    sharedGroups[key] = handles.count
+                    handles.append(WallHandle(id: key, segment: segment, walls: walls))
+                }
+            } else {
+                let id = "\(segment.roomID)-\(segment.edge)-\(segment.range.lowerBound)"
+                handles.append(WallHandle(id: id, segment: segment, walls: [(segment.roomID, segment.edge)]))
             }
         }
         return ForEach(handles) { handle in
-            let id = handle.roomID, edge = handle.edge, line = handle.line, middle = handle.middle
+            let edge = handle.segment.edge, line = handle.segment.line, middle = handle.segment.middle
             Capsule()
                 .fill(Color.accentColor)
                 .overlay(Capsule().stroke(.white, lineWidth: 1.5))
@@ -146,8 +159,7 @@ struct MapView: View {
                         .onChanged { value in
                             // ⌥ Option: move only this room's wall, detaching it from its neighbors.
                             let current = drag ?? WallDrag(
-                                walls: NSEvent.modifierFlags.contains(.option)
-                                    ? [(id, edge)] : FloorPlanEditing.linkedEdges(of: id, edge, in: rects),
+                                walls: NSEvent.modifierFlags.contains(.option) ? [handle.walls[0]] : handle.walls,
                                 startRects: rects
                             )
                             drag = current

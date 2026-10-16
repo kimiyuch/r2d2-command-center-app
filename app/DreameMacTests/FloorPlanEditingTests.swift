@@ -61,4 +61,31 @@ import Testing
         #expect(abs((room?.area ?? 0) - 10 * 12 * 0.0025) < 0.0001)
         #expect(edited.rooms.first { $0.id == 1 } == RobotMap.mock.rooms.first { $0.id == 1 })
     }
+
+    @Test func splitsWallsIntoSharedAndExteriorSegments() {
+        // Kitchen 0-10 × 0-20, living room to its right but only for y 0-10.
+        let rects: [Int: MapRect] = [
+            7: MapRect(x0: 0, y0: 0, x1: 10, y1: 20),
+            6: MapRect(x0: 10, y0: 0, x1: 30, y1: 10),
+        ]
+        let kitchenRight = FloorPlanEditing.segments(in: rects).filter { $0.roomID == 7 && $0.edge == .right }
+        #expect(kitchenRight.map(\.range) == [0...10, 10...20])
+        #expect(kitchenRight.map(\.isShared) == [true, false])
+
+        // The living room's left wall is entirely shared, so it has no exterior part.
+        let livingLeft = FloorPlanEditing.segments(in: rects).filter { $0.roomID == 6 && $0.edge == .left }
+        #expect(livingLeft.map(\.isShared) == [true])
+    }
+
+    @Test func exteriorWallsSkipEdgesWhereRoomsMeet() {
+        // Three rooms in a row along one line (like corridor + Miyu above the living room): the line
+        // between them and the room below is entirely interior.
+        let rects: [Int: MapRect] = [
+            2: MapRect(x0: 0, y0: 0, x1: 10, y1: 10),
+            1: MapRect(x0: 10, y0: 0, x1: 30, y1: 10),
+            6: MapRect(x0: 0, y0: 10, x1: 30, y1: 20),
+        ]
+        let exteriorOnTheLine = FloorPlanEditing.segments(in: rects).filter { !$0.isShared && $0.line == 10 && !$0.edge.isVertical }
+        #expect(exteriorOnTheLine.isEmpty)
+    }
 }

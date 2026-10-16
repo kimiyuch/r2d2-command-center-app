@@ -87,3 +87,68 @@ enum FloorPlanEditing {
         return (value - 0.5).rounded() + 0.5
     }
 }
+
+/// A stretch of a room wall: either shared with a neighboring room (flush, on the other side) or exterior.
+struct WallSegment: Hashable, Sendable {
+    let roomID: Int
+    let edge: RectEdge
+    /// Position of the wall line (x for vertical walls, y for horizontal ones).
+    let line: Double
+    /// Extent along the wall.
+    let range: ClosedRange<Double>
+    let isShared: Bool
+
+    var middle: Double { (range.lowerBound + range.upperBound) / 2 }
+    var length: Double { range.upperBound - range.lowerBound }
+
+    var endpoints: (MapPoint, MapPoint) {
+        edge.isVertical
+            ? (MapPoint(x: line, y: range.lowerBound), MapPoint(x: line, y: range.upperBound))
+            : (MapPoint(x: range.lowerBound, y: line), MapPoint(x: range.upperBound, y: line))
+    }
+}
+
+extension FloorPlanEditing {
+    /// Splits every room wall into the parts shared with a flush neighbor and the exterior parts.
+    static func segments(in rects: [Int: MapRect]) -> [WallSegment] {
+        var result: [WallSegment] = []
+        for (id, rect) in rects.sorted(by: { $0.key < $1.key }) {
+            for edge in RectEdge.allCases {
+                let line = edge.value(of: rect)
+                let span = edge.span(of: rect)
+                var shared: [ClosedRange<Double>] = []
+                for (otherID, other) in rects where otherID != id {
+                    for candidate in RectEdge.allCases where candidate.isVertical == edge.isVertical && candidate != edge {
+                        guard abs(candidate.value(of: other) - line) < 0.01 else { continue }
+                        let otherSpan = candidate.span(of: other)
+                        let lower = max(span.lowerBound, otherSpan.lowerBound), upper = min(span.upperBound, otherSpan.upperBound)
+                        if lower < upper { shared.append(lower...upper) }
+                    }
+                }
+                shared = merged(shared)
+                for range in shared {
+                    result.append(WallSegment(roomID: id, edge: edge, line: line, range: range, isShared: true))
+                }
+                // The rest of the wall is exterior.
+                var start = span.lowerBound
+                for range in shared + [span.upperBound...span.upperBound] {
+                    if range.lowerBound - start > 0.01 {
+                        result.append(WallSegment(roomID: id, edge: edge, line: line, range: start...range.lowerBound, isShared: false))
+                    }
+                    start = max(start, range.upperBound)
+                }
+            }
+        }
+        return result
+    }
+
+    private static func merged(_ ranges: [ClosedRange<Double>]) -> [ClosedRange<Double>] {
+        ranges.sorted { $0.lowerBound < $1.lowerBound }.reduce(into: []) { result, range in
+            if let last = result.last, range.lowerBound <= last.upperBound {
+                result[result.count - 1] = last.lowerBound...max(last.upperBound, range.upperBound)
+            } else {
+                result.append(range)
+            }
+        }
+    }
+}
