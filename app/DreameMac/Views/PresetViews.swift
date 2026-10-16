@@ -1,16 +1,36 @@
 import SwiftUI
 
-/// Preset buttons plus add/edit, shown in the main window.
+/// Preset buttons plus add/edit, shown in the main window. Collapsible; the state survives relaunches.
 struct PresetsSection: View {
     @Environment(AppModel.self) private var model
     @State private var editing: Preset?
+    @AppStorage("presetsExpanded") private var isExpanded = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Presets").font(.headline)
+                Button {
+                    withAnimation(.snappy) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        Text("Presets").font(.headline)
+                        if !isExpanded && !model.presets.isEmpty {
+                            Text("\(model.presets.count)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isExpanded ? "Collapse Presets" : "Expand Presets")
                 Spacer()
                 Button("New Preset", systemImage: "plus") {
+                    isExpanded = true
                     editing = Preset(name: "", roomIDs: [], mode: .vacuum)
                 }
                 .labelStyle(.iconOnly)
@@ -19,14 +39,16 @@ struct PresetsSection: View {
                 .help(model.rooms.isEmpty ? "Waiting for the room list…" : "New Preset")
             }
 
-            if model.presets.isEmpty {
-                Text("Save a cleaning job, like “Kitchen after dinner, vacuum only”, to run it with one click, a keyboard shortcut or Siri.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(Array(model.presets.enumerated()), id: \.element.id) { index, preset in
-                    PresetRow(preset: preset, shortcutNumber: index < 9 ? index + 1 : nil) {
-                        editing = preset
+            if isExpanded {
+                if model.presets.isEmpty {
+                    Text("Save a cleaning job, like “Kitchen after dinner, vacuum only”, to run it with one click, a keyboard shortcut or Siri.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(model.presets.enumerated()), id: \.element.id) { index, preset in
+                        PresetRow(preset: preset, shortcutNumber: index < 9 ? index + 1 : nil) {
+                            editing = preset
+                        }
                     }
                 }
             }
