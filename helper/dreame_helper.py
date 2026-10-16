@@ -11,10 +11,10 @@ Methods:
   status      {}                                        -> {state, error, battery, charging, status, suction, task, cleaningMode}
   action      {name: start|pause|stop|dock|locate}      -> {}
   rooms       {}                                        -> [{id, name, type}]
-  map         {}                                        -> {mapID, width, height, pixels, rooms: [{id, name, x, y}], charger}
-              pixels: base64 uint8 per pixel, row-major from the top-left, already rotated like the Dreame app.
-              Values: 0 outside, 1-63 floor of that room, 101-163 that room's edge, 254/253 floor without room.
-              status then also contains `robot: {x, y}` in the same image coordinates.
+  map         {}                                        -> {mapID, width, height, outline, rooms: [{id, name, x, y, area, outline}], charger}
+              Clean vector floor plan (see floorplan.py) in pixel coordinates of the map as rotated in the Dreame app.
+              outline: list of rings [x0, y0, x1, y1, ...], filled with the even-odd rule (holes included).
+              area in m². status then also contains `robot: {x, y}` in the same coordinates.
   cleanRooms  {rooms: [id], mode?, suction?, repeats?}  -> {}
               mode: vacuum|mop|vacuum_and_mop|mop_after_vacuum, suction: quiet|standard|strong|turbo
 
@@ -25,7 +25,6 @@ Secrets only ever arrive over stdin; the app owns the Keychain. stdout is reserv
 all logging goes to stderr.
 """
 
-import base64
 import json
 import logging
 import sys
@@ -33,8 +32,11 @@ import time
 from enum import IntEnum
 from pathlib import Path
 
+# The app runs us with `python -I`, which leaves the script's own directory off sys.path.
+sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent / "vendor"))
 
+import floorplan  # noqa: E402
 import numpy as np  # noqa: E402
 from dreame.device import DreameVacuumDevice  # noqa: E402
 from dreame.exceptions import DeviceException  # noqa: E402
@@ -272,15 +274,28 @@ class Session:
         image = np.ascontiguousarray(np.rot90(image, quarter_turns), dtype=np.uint8)
         self.map_transform = transform
 
+        segments = saved.segments or {}
+        plan = floorplan.build(image, [int(segment_id) for segment_id in segments])
+        square_meters_per_pixel = (saved.dimensions.grid_size / 1000) ** 2
         rooms = []
-        for segment_id, segment in sorted((saved.segments or {}).items()):
-            center = transform(type("P", (), {"x": segment.x, "y": segment.y})) if segment.x is not None else None
-            rooms.append({"id": int(segment_id), "name": segment.custom_name or segment.name, **(center or {})})
+        for segment_id, segment in sorted(segments.items()):
+            room = plan["rooms"].get(int(segment_id))
+            if room is None:
+                continue
+            x, y = room["center"]
+            rooms.append({
+                "id": int(segment_id),
+                "name": segment.custom_name or segment.name,
+                "x": x,
+                "y": y,
+                "area": round(room["pixels"] * square_meters_per_pixel, 1),
+                "outline": room["outline"],
+            })
         return {
             "mapID": saved.map_id,
             "width": image.shape[1],
             "height": image.shape[0],
-            "pixels": base64.b64encode(image.tobytes()).decode(),
+            "outline": plan["outline"],
             "rooms": rooms,
             "charger": transform(saved.charger_position) if saved.charger_position else None,
         }

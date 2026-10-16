@@ -1,37 +1,70 @@
 import Foundation
 
-/// The saved map as sent by the helper: one byte per pixel, rows from the top-left, already rotated
-/// like in the Dreamehome app. Coordinates of rooms, dock and robot are in the same pixel space.
+/// Clean floor plan of the saved map, as computed by the helper (`floorplan.py`): one outline for the
+/// home and one per room, in pixel coordinates of the map as rotated in the Dreamehome app. Robot and
+/// dock positions use the same coordinates.
 struct RobotMap: Codable, Hashable, Sendable {
     let mapID: Int
     let width: Int
     let height: Int
-    /// 0 outside, 1–63 floor of that room, 101–163 that room's edge, other values floor without a room.
-    let pixels: Data
+    let outline: [MapRing]
     let rooms: [MapRoom]
     let charger: MapPoint?
 
-    func pixel(x: Int, y: Int) -> UInt8? {
-        guard (0..<width).contains(x), (0..<height).contains(y) else { return nil }
-        return pixels[pixels.startIndex + y * width + x]
-    }
-
-    func roomID(x: Int, y: Int) -> Int? {
-        guard let value = pixel(x: x, y: y) else { return nil }
-        switch value {
-        case 1...63: return Int(value)
-        case 101...163: return Int(value) - 100
-        default: return nil
-        }
+    /// The room containing a point, if any.
+    func roomID(at point: MapPoint) -> Int? {
+        rooms.first { $0.contains(point) }?.id
     }
 }
 
 struct MapRoom: Codable, Hashable, Sendable, Identifiable {
     let id: Int
     let name: String
-    /// Label position; missing if the robot didn't report a room center.
-    var x: Double?
-    var y: Double?
+    /// Label position: the point deepest inside the room.
+    let x: Double
+    let y: Double
+    /// Floor area in m².
+    let area: Double
+    let outline: [MapRing]
+
+    /// Even-odd rule over all rings, so holes don't count.
+    func contains(_ point: MapPoint) -> Bool {
+        outline.reduce(false) { inside, ring in ring.contains(point) != inside }
+    }
+}
+
+/// A closed polygon, encoded by the helper as a flat [x0, y0, x1, y1, ...] array.
+struct MapRing: Codable, Hashable, Sendable {
+    let points: [MapPoint]
+
+    init(points: [MapPoint]) {
+        self.points = points
+    }
+
+    init(from decoder: any Decoder) throws {
+        let flat = try decoder.singleValueContainer().decode([Double].self)
+        points = stride(from: 0, to: flat.count - 1, by: 2).map { MapPoint(x: flat[$0], y: flat[$0 + 1]) }
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(points.flatMap { [$0.x, $0.y] })
+    }
+
+    /// Ray casting point-in-polygon test.
+    func contains(_ point: MapPoint) -> Bool {
+        var inside = false
+        var j = points.count - 1
+        for i in points.indices {
+            let a = points[i], b = points[j]
+            if (a.y > point.y) != (b.y > point.y),
+               point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x {
+                inside.toggle()
+            }
+            j = i
+        }
+        return inside
+    }
 }
 
 struct MapPoint: Codable, Hashable, Sendable {

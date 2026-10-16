@@ -102,8 +102,8 @@ Still open in Phase 1:
 - Refresh tokens the vendored client renews internally during a long session aren't reported back to the app (password fallback covers it).
 
 **Phase 2: Map & rooms**: *map done 2026-10-16*
-- Helper `map`: saved map from `dreame_vacuum` (`selected_map.pixel_type`) as one byte per pixel (flipped, cropped to content, rotated by `rotation` like the Dreamehome app), plus room centers and dock in the same pixel coordinates. `status` adds `robot` (live map position, same coordinates).
-- App: `MapView` renders the pixels into a `CGImage` (room colors, edges, selection/hover), overlays names, dock and robot; click toggles rooms. Main window is now two panes: map with a selection bar (mode, "Clean", "Save as Preset…") left, status/presets/controls right. The preset editor also has the map. Polls every 5 s while cleaning (the helper answers from its cache).
+- Helper `map`: saved map from `dreame_vacuum` (`selected_map.pixel_type`, flipped, cropped, rotated by `rotation` like the Dreamehome app), turned into a **clean vector floor plan** by `helper/floorplan.py` (OpenCV): rooms grown over unassigned floor until they tile the home, furniture holes < 1.5 m² filled, outlines simplified and near-axis walls straightened. Sends home outline + per-room outline, area (m²), label point; dock and `status.robot` in the same coordinates. OpenCV adds ~119 MB to the helper environment (matters for bundling; a Swift/Vision port is possible).
+- App: `MapView` draws the outlines with `Canvas` (translucent room fills over the floor color, so dark mode works; interior walls as floor-colored lines, exterior wall dark), names + m², dock and robot; click/hover hit-tests the room polygons (even-odd). Main window is now two panes: map with a selection bar (mode, "Clean", "Save as Preset…") left, status/presets/controls right. The preset editor also has the map. Polls every 5 s while cleaning (the helper answers from its cache).
 - Not yet: cleaning path, no-go zones/virtual walls, live (uncleaned/cleaned) map during a run, rotating the map in the app.
 
 **Phase 3: Extras**

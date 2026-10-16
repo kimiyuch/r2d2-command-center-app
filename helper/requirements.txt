@@ -2,6 +2,7 @@ cryptography==50.0.2
 keyring==25.7.0
 mini-racer==0.14.1
 numpy==2.5.4
+opencv-python-headless==5.0.0.93
 paho-mqtt==2.1.0
 pillow==12.3.0
 pycryptodome==4.0.0

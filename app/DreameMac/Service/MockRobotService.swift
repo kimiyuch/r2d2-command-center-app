@@ -89,23 +89,18 @@ final class InMemorySecretStore: SecretStore, @unchecked Sendable {
 }
 
 extension RobotMap {
-    /// Three rooms side by side (ids 1, 6, 7 like `MockRobotService.rooms`), with edges, 30×10 pixels.
+    /// Three rooms side by side (ids 1, 6, 7 like `MockRobotService.rooms`) in a 30×10 home.
     static let mock: RobotMap = {
-        let width = 30, height = 10
-        var pixels = [UInt8](repeating: 0, count: width * height)
-        for y in 1..<9 {
-            for x in 1..<29 {
-                let room: UInt8 = x < 10 ? 1 : x < 20 ? 6 : 7
-                let edge = y == 1 || y == 8 || x == 1 || x == 28 || x % 10 == 0
-                pixels[y * width + x] = edge ? room + 100 : room
-            }
+        func rect(_ x0: Double, _ y0: Double, _ x1: Double, _ y1: Double) -> MapRing {
+            MapRing(points: [MapPoint(x: x0, y: y0), MapPoint(x: x1, y: y0), MapPoint(x: x1, y: y1), MapPoint(x: x0, y: y1)])
         }
         return RobotMap(
-            mapID: 1, width: width, height: height, pixels: Data(pixels),
+            mapID: 1, width: 30, height: 10,
+            outline: [rect(0, 0, 30, 10)],
             rooms: [
-                MapRoom(id: 1, name: "Primary Bedroom", x: 5, y: 5),
-                MapRoom(id: 6, name: "Living Room", x: 15, y: 5),
-                MapRoom(id: 7, name: "Dining Hall", x: 24, y: 5),
+                MapRoom(id: 1, name: "Primary Bedroom", x: 5, y: 5, area: 4, outline: [rect(0, 0, 10, 10)]),
+                MapRoom(id: 6, name: "Living Room", x: 15, y: 5, area: 4, outline: [rect(10, 0, 20, 10), rect(13, 3, 17, 7)]),
+                MapRoom(id: 7, name: "Dining Hall", x: 25, y: 5, area: 4, outline: [rect(20, 0, 30, 10)]),
             ],
             charger: MapPoint(x: 3, y: 7)
         )

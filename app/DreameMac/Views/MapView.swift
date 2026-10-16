@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The robot's saved map: rooms colored and labeled, dock and robot marked. Tapping a room toggles it
-/// in `selection` (if given).
+/// The robot's saved map as a clean floor plan: rooms filled and labeled, walls drawn, dock and robot
+/// marked. Clicking a room toggles it in `selection` (if given).
 struct MapView: View {
     let map: RobotMap
     var selection: Binding<Set<Int>>?
@@ -10,50 +10,42 @@ struct MapView: View {
     var roomNames: [Int: String] = [:]
 
     @State private var hoveredRoomID: Int?
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Soft room hues; drawn translucent over the floor so they work in light and dark mode.
+    private static let palette: [Color] = [
+        .blue, .green, .orange, .purple, .yellow, .pink, .teal, .mint, .indigo,
+    ]
 
     var body: some View {
         GeometryReader { geometry in
             let layout = Layout(map: map, size: geometry.size)
             ZStack(alignment: .topLeading) {
-                Image(decorative: MapRenderer.image(for: map, selected: selection?.wrappedValue ?? [], hovered: hoveredRoomID), scale: 1)
-                    .interpolation(.none)
-                    .resizable()
-                    .frame(width: layout.size.width, height: layout.size.height)
-                    .offset(x: layout.origin.x, y: layout.origin.y)
+                Canvas { context, _ in draw(in: &context, layout: layout) }
 
                 ForEach(map.rooms) { room in
-                    if let x = room.x, let y = room.y {
-                        Text(roomNames[room.id] ?? room.name)
-                            .font(.caption.weight(isSelected(room.id) ? .bold : .medium))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(.background.opacity(0.75), in: .capsule)
-                            .fixedSize()
-                            .position(layout.point(x: x, y: y))
-                            .allowsHitTesting(false)
-                    }
+                    label(for: room)
+                        .position(layout.point(room.x, room.y))
                 }
-
                 if let charger = map.charger {
                     marker(systemImage: "bolt.fill", color: .green)
-                        .position(layout.point(x: charger.x, y: charger.y))
+                        .position(layout.point(charger.x, charger.y))
                 }
                 if let robot {
                     marker(systemImage: "robotic.vacuum.fill", color: .accentColor)
-                        .position(layout.point(x: robot.x, y: robot.y))
+                        .position(layout.point(robot.x, robot.y))
                         .animation(.easeInOut(duration: 1), value: robot)
                 }
             }
             .contentShape(.rect)
             .onContinuousHover { phase in
                 switch phase {
-                case .active(let location): hoveredRoomID = selection == nil ? nil : layout.roomID(at: location)
+                case .active(let location): hoveredRoomID = selection == nil ? nil : map.roomID(at: layout.mapPoint(location))
                 case .ended: hoveredRoomID = nil
                 }
             }
             .onTapGesture { location in
-                guard let selection, let id = layout.roomID(at: location) else { return }
+                guard let selection, let id = map.roomID(at: layout.mapPoint(location)) else { return }
                 if selection.wrappedValue.contains(id) {
                     selection.wrappedValue.remove(id)
                 } else {
@@ -66,8 +58,43 @@ struct MapView: View {
         .accessibilityLabel("Map")
     }
 
-    private func isSelected(_ id: Int) -> Bool {
-        selection?.wrappedValue.contains(id) == true
+    private func draw(in context: inout GraphicsContext, layout: Layout) {
+        let home = layout.path(map.outline)
+        let floor = colorScheme == .dark ? Color(white: 0.17) : .white
+        let wallWidth = max(2, layout.scale * 0.9)
+
+        var shadow = context
+        shadow.addFilter(.shadow(color: .black.opacity(colorScheme == .dark ? 0.5 : 0.12), radius: 10, y: 4))
+        shadow.fill(home, with: .color(floor), style: FillStyle(eoFill: true))
+
+        for room in map.rooms {
+            let path = layout.path(room.outline)
+            let selected = selection?.wrappedValue.contains(room.id) == true
+            let tint = Self.palette[room.id % Self.palette.count]
+            context.fill(path, with: .color(selected ? .accentColor.opacity(0.75) : tint.opacity(0.22)), style: FillStyle(eoFill: true))
+            if room.id == hoveredRoomID && !selected {
+                context.fill(path, with: .color(.accentColor.opacity(0.18)), style: FillStyle(eoFill: true))
+            }
+        }
+        // Interior walls: thin floor-colored lines where rooms meet; then the exterior wall on top.
+        for room in map.rooms {
+            context.stroke(layout.path(room.outline), with: .color(floor), style: StrokeStyle(lineWidth: wallWidth * 0.6, lineJoin: .round))
+        }
+        context.stroke(home, with: .color(.primary.opacity(0.8)), style: StrokeStyle(lineWidth: wallWidth, lineJoin: .round))
+    }
+
+    private func label(for room: MapRoom) -> some View {
+        let selected = selection?.wrappedValue.contains(room.id) == true
+        return VStack(spacing: 0) {
+            Text(roomNames[room.id] ?? room.name)
+                .font(.caption.weight(.semibold))
+            Text("\(room.area, format: .number.precision(.fractionLength(0))) m²")
+                .font(.caption2)
+                .opacity(0.7)
+        }
+        .foregroundStyle(selected ? Color.white : Color.primary)
+        .fixedSize()
+        .allowsHitTesting(false)
     }
 
     private func marker(systemImage: String, color: Color) -> some View {
@@ -81,80 +108,42 @@ struct MapView: View {
             .allowsHitTesting(false)
     }
 
-    /// Aspect-fit placement of the map image and conversions between map pixels and view points.
+    /// Aspect-fit placement of the map and conversions between map and view coordinates.
     private struct Layout {
-        let map: RobotMap
         let scale: CGFloat
         let origin: CGPoint
-        let size: CGSize
 
         init(map: RobotMap, size available: CGSize) {
-            self.map = map
             scale = min(available.width / CGFloat(map.width), available.height / CGFloat(map.height))
-            size = CGSize(width: CGFloat(map.width) * scale, height: CGFloat(map.height) * scale)
-            origin = CGPoint(x: (available.width - size.width) / 2, y: (available.height - size.height) / 2)
+            origin = CGPoint(
+                x: (available.width - CGFloat(map.width) * scale) / 2,
+                y: (available.height - CGFloat(map.height) * scale) / 2
+            )
         }
 
-        /// Map coordinates refer to pixel centers.
-        func point(x: Double, y: Double) -> CGPoint {
+        /// Map coordinates are pixel indices; draw at pixel centers.
+        func point(_ x: Double, _ y: Double) -> CGPoint {
             CGPoint(x: origin.x + (x + 0.5) * scale, y: origin.y + (y + 0.5) * scale)
         }
 
-        func roomID(at location: CGPoint) -> Int? {
-            let x = Int(((location.x - origin.x) / scale).rounded(.down))
-            let y = Int(((location.y - origin.y) / scale).rounded(.down))
-            return map.roomID(x: x, y: y)
+        func mapPoint(_ location: CGPoint) -> MapPoint {
+            MapPoint(x: (location.x - origin.x) / scale - 0.5, y: (location.y - origin.y) / scale - 0.5)
         }
-    }
-}
 
-enum MapRenderer {
-    /// Soft room colors; selected rooms use the accent color.
-    private static let palette: [(UInt8, UInt8, UInt8)] = [
-        (186, 214, 235), (198, 228, 199), (240, 214, 180), (222, 205, 234), (246, 220, 158),
-        (243, 200, 205), (196, 222, 222), (225, 225, 190), (210, 210, 228),
-    ]
-    private static let edge: (UInt8, UInt8, UInt8) = (88, 98, 110)
-    private static let floor: (UInt8, UInt8, UInt8) = (222, 222, 222)
-    private static let selected: (UInt8, UInt8, UInt8) = (10, 132, 255)
-
-    static func image(for map: RobotMap, selected selection: Set<Int>, hovered: Int?) -> CGImage {
-        var rgba = [UInt8](repeating: 0, count: map.width * map.height * 4)
-        for (index, value) in map.pixels.enumerated() where value != 0 {
-            let room = value <= 63 ? Int(value) : (101...163).contains(value) ? Int(value) - 100 : nil
-            var color: (UInt8, UInt8, UInt8)
-            if (101...163).contains(value) || value == 255 {
-                color = edge
-            } else if let room {
-                color = selection.contains(room) ? selected : palette[room % palette.count]
-                if room == hovered { color = blend(color, with: selected, amount: selection.contains(room) ? 0 : 0.35) }
-            } else {
-                color = floor
+        func path(_ rings: [MapRing]) -> Path {
+            var path = Path()
+            for ring in rings where ring.points.count > 2 {
+                path.addLines(ring.points.map { point($0.x, $0.y) })
+                path.closeSubpath()
             }
-            let offset = index * 4
-            rgba[offset] = color.0
-            rgba[offset + 1] = color.1
-            rgba[offset + 2] = color.2
-            rgba[offset + 3] = 255
+            return path
         }
-        let provider = CGDataProvider(data: Data(rgba) as CFData)!
-        return CGImage(
-            width: map.width, height: map.height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: map.width * 4,
-            space: CGColorSpace(name: CGColorSpace.sRGB)!,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
-        )!
-    }
-
-    private static func blend(_ a: (UInt8, UInt8, UInt8), with b: (UInt8, UInt8, UInt8), amount: Double) -> (UInt8, UInt8, UInt8) {
-        func mix(_ x: UInt8, _ y: UInt8) -> UInt8 { UInt8(Double(x) * (1 - amount) + Double(y) * amount) }
-        return (mix(a.0, b.0), mix(a.1, b.1), mix(a.2, b.2))
     }
 }
 
 #Preview {
     @Previewable @State var selection: Set<Int> = [6]
-    MapView(map: .mock, selection: $selection, robot: MapPoint(x: 12, y: 4))
+    MapView(map: .mock, selection: $selection, robot: MapPoint(x: 12, y: 2))
         .padding()
         .frame(width: 500, height: 220)
 }
